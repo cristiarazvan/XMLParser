@@ -6,7 +6,9 @@
                 <book isbn="123-456-789" year="2020" available="true">
                     <title>The Great Adventure</title>
                     <author id="auth1">
-                        <name>John Smith</name>
+                        <name>
+                            John Smith
+                        </name>
                         <nationality>American</nationality>
                     </author>
                     <details>
@@ -14,7 +16,7 @@
                         <price>0.99</price>
                         <rating scale="5">4.5</rating>
                     </details>
-        <salut>Mancare</salut>                </book>
+        <salut>Mancare</salut>                </book>b
                 <book isbn="987-654-321" year="2021" available="false">
                     <title>Mystery Manor</title>
                     <author id="auth2">
@@ -22,8 +24,8 @@
                         <nationality>British</nationality>
                     </author>
                     <details>
-                        <publisher>ReadersChoice</publisher>
-                        <price>0.99</price>
+                        <publisher> <publish2>ReadersChoice</publish2> </publisher>
+                        <price> 0.99</price>
                         <rating scale="5">4.8</rating>
                     </details>
         <salut>Mancare</salut>                </book>
