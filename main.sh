@@ -1,42 +1,8 @@
 #!/bin/bash
 
-declare -a stack 
 
 output_file=""
 
-push() {
-
-    local item="$1"
-    stack+=("$item")
-    echo "Pushed $item" 
-
-}
-
-is_empty() {
-    if [[ ${#stack[@]} -eq 0 ]]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-pop() {
-    if is_empty; then
-        echo "Stack is empty!"
-        return
-    fi 
-    local item="${stack[-1]}"
-    unset stack[-1]
-    echo "Popped $item"
-}
-
-top() {
-    if is_empty; then
-        echo "Stack is empty!"
-        return
-    fi
-    echo "Top: ${stack[-1]}"
-}
 
 
 
@@ -54,31 +20,44 @@ make_format_input() {
 add_indent() {
     local indent_level=0
     local line=""
-    declare -a is_last_child  
+    declare -a is_last_child
     
     while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
+        # Skip empty lines and XML declaration
+        [[ -z "$line" || $line =~ ^\<\?xml ]] && continue
         
-        
+        # Calculate current line's indentation
         local prefix=""
         for ((i = 0; i < indent_level; i++)); do
             if [[ ${is_last_child[$i]} -eq 1 ]]; then
-                prefix+="    "  
+                prefix+="    "
             else
-                prefix+="│   "  
+                prefix+="│   "
             fi
         done
         
+        # Handle closing tags
         if [[ $line =~ ^"</" ]]; then
             ((indent_level--))
-            echo "${prefix}└── $line"  
+            # Get the last element's prefix
+            prefix=""
+            for ((i = 0; i < indent_level; i++)); do
+                if [[ ${is_last_child[$i]} -eq 1 ]]; then
+                    prefix+="    "
+                else
+                    prefix+="│   "
+                fi
+            done
+            echo "${prefix}├── $line"
             is_last_child[$indent_level]=1
+        # Handle opening tags
         elif [[ $line =~ ^"<"[^/] ]]; then
-            echo "${prefix}├── $line"  
+            echo "${prefix}├── $line"
             is_last_child[$indent_level]=0
             ((indent_level++))
+        # Handle content
         else
-            echo "${prefix}├── $line" 
+            echo "${prefix}├── $line"
         fi
         
     done < "$1"
@@ -204,7 +183,7 @@ delete_xml_tag() {
     fi
 }
 
-elete_xml_attr() {
+delete_xml_attr() {
     if [ $# -eq 0 ]; then
         echo "No arguments passed."
         return 1
@@ -283,7 +262,7 @@ elete_xml_attr() {
     echo "$result" > "$output_file"
 }
 
-add_tag(){
+add(){
     local file="$1"
     local parent_tag
     local index_ptag
@@ -318,7 +297,7 @@ add_tag(){
     done
 
     while [ 0 -eq 0 ]; do
-        read -p "Enter index of the parent tag (or press enter to insert in all of the specified parent tag): " index_ptag
+        read -p "Enter index of the parent tag (or press enter to insert in all occurances of the specified parent tag): " index_ptag
         if [ -z "$index_ptag" ]; then
             index_ptag=0
             echo -e $index_ptag
@@ -420,7 +399,7 @@ delete() {
         else
             delete_xml_attr "$attr_name"
         fi
-        delete_xml_tag "$tag_name"
+        
     elif [ $typeOfDelete -eq 2 ]; then
         read -p "Enter the index: " index
 
@@ -429,7 +408,6 @@ delete() {
         else
             delete_xml_attr "$attr_name" $index
         fi
-        delete_xml_tag "$tag_name" $index
     else
         read -p "Enter the start index: " start_index
         read -p "Enter the count: " count
@@ -438,17 +416,87 @@ delete() {
         else
             delete_xml_attr "$attr_name" $start_index $count
         fi
-        delete_xml_tag "$tag_name" $start_index $count
     fi
 
-
 }
 
-modify(){
+modify() {
+    local file="$1"
+    local tag_name
+    local index
+    local modification
+    local current_index=0
+    local temp_file=$(mktemp)
+    local skip=0
     
-
+    read -p "Enter the tag name to modify: " tag_name
+    read -p "Enter the index of the tag to modify: " index
+    read -p "Enter the modified version: " modification
+    
+    # Split the modification into tag name and attributes
+    local mod_tag=$(echo "$modification" | awk '{print $1}')
+    local mod_attrs=$(echo "$modification" | cut -d' ' -f2-)
+    
+    while IFS= read -r line; do
+        if [[ $line =~ ^\<$tag_name([[:space:]]|>) ]]; then
+            ((current_index++))
+            if [ $current_index -eq $index ]; then
+                # Handle modification with or without attributes
+                if [ -n "$mod_attrs" ]; then
+                    echo "<$mod_tag $mod_attrs>" >> "$temp_file"
+                else
+                    echo "<$mod_tag>" >> "$temp_file"
+                fi
+                skip=1
+                continue
+            fi
+        elif [[ $line =~ ^\<\/${tag_name}\> && $skip -eq 1 ]]; then
+            echo "</$mod_tag>" >> "$temp_file"
+            skip=0
+            continue
+        fi
+        echo "$line" >> "$temp_file"
+    done < "$file"
+    
+    mv "$temp_file" "$file"
+    echo "Tag modified successfully!"
 }
 
+format_xml() {
+    local file="$1"
+    local indent=0
+    local temp_file=$(mktemp)
+    
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        
+        # Calculate indentation spaces
+        local spaces=""
+        for ((i=0; i<indent; i++)); do
+            spaces+="    "
+        done
+        
+        # Handle closing tags
+        if [[ $line =~ \<\/.+\> ]]; then
+            ((indent--))
+            spaces=""
+            for ((i=0; i<indent; i++)); do
+                spaces+="    "
+            done
+            echo "${spaces}${line}" >> "$temp_file"
+        # Handle opening tags
+        elif [[ $line =~ \<[^/].+\> ]]; then
+            echo "${spaces}${line}" >> "$temp_file"
+            ((indent++))
+        # Handle content
+        else
+            echo "${spaces}${line}" >> "$temp_file"
+        fi
+    done < "$file"
+    
+    mv "$temp_file" "$file"
+    echo "XML file formatted successfully!"
+}
 
 main() {
     local file="example.xml"
@@ -460,16 +508,18 @@ main() {
         echo "2. Add"
         echo "3. Delete"
         echo "4. Modify"
-        echo "5. Exit"
-        read -p "Choose an option (1-5): " choice
+        echo "5. Format XML"
+        echo "6. Exit"
+        read -p "Choose an option (1-6): " choice
         
         case $choice in
             1) display_tree "$output_file" ;;
             2) add "$output_file" ;;
             3) delete "$output_file" ;;
             4) modify "$output_file" ;;
-            5) echo "Exiting..."; exit 0 ;;
-            *) echo "Invalid option! Please choose 1-4" ;;
+            5) format_xml "$output_file" ;;
+            6) echo "Exiting..."; exit 0 ;;
+            *) echo "Invalid option! Please choose 1-6" ;;
         esac
     done
 }
