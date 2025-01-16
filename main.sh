@@ -182,6 +182,7 @@ delete_xml_tag() {
 
 
     echo "$result" > "$output_file"
+    echo "Tag deleted successfully!"
 }
 
 
@@ -262,6 +263,7 @@ delete_xml_attr() {
 
    
     echo "$result" > "$output_file"
+    echo "Attribute deleted successfully!"
 }
 
 
@@ -599,4 +601,3 @@ main() {
 }
 
 main "$@"
-
